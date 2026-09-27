@@ -1,0 +1,98 @@
+// Phase 12 — Simple CI for Order Management System
+// Declarative Pipeline. Requires: JDK 8, Maven 3.8+, Docker (for image stage).
+
+pipeline {
+    agent any
+
+    tools {
+        jdk 'JDK8'
+        maven 'Maven3'
+    }
+
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '20'))
+    }
+
+    environment {
+        MAVEN_OPTS = '-Xmx1024m'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Compile') {
+            steps {
+                sh 'mvn -B -DskipTests clean compile'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                sh 'mvn -B -pl order-service,inventory-service,payment-service,notification-service,api-gateway test'
+            }
+            post {
+                always {
+                    junit allowEmptyResults: true, testResults: '**/target/surefire-reports/*.xml'
+                }
+            }
+        }
+
+        stage('Package') {
+            steps {
+                sh 'mvn -B -DskipTests package'
+            }
+            post {
+                success {
+                    archiveArtifacts artifacts: '*/target/*.jar', fingerprint: true, allowEmptyArchive: true
+                }
+            }
+        }
+
+        stage('Docker Build') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'master'
+                    expression { return params.BUILD_IMAGES == true }
+                }
+            }
+            steps {
+                sh 'docker compose build'
+            }
+        }
+
+        stage('Deploy (optional)') {
+            when {
+                expression { return params.DEPLOY == true }
+            }
+            steps {
+                echo 'Deploy: docker compose up -d on target host (manual / SSH step — keep env-specific)'
+                // Example (uncomment and adapt for your agent/SSH setup):
+                // sh 'docker compose up -d'
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'CI OK — artifacts packaged'
+        }
+        failure {
+            echo 'CI failed — check Test / Package stage logs'
+        }
+        always {
+            cleanWs(deleteDirs: true, notFailBuild: true)
+        }
+    }
+
+    parameters {
+        booleanParam(name: 'BUILD_IMAGES', defaultValue: false, description: 'Build Docker images (also auto on main/master)')
+        booleanParam(name: 'DEPLOY', defaultValue: false, description: 'Run optional deploy step')
+    }
+}

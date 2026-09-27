@@ -1,0 +1,18 @@
+# Frontend only — proxies to backends published on the Docker host
+services:
+  oms-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Same-origin paths; Nginx proxies to host ports below
+        REACT_APP_ORDER_SERVICE_URL: /backend/order
+        REACT_APP_INVENTORY_SERVICE_URL: /backend/inventory
+        REACT_APP_PAYMENT_SERVICE_URL: /backend/payment
+        REACT_APP_NOTIFICATION_SERVICE_URL: /backend/notification
+        REACT_APP_GATEWAY_URL: /backend/gateway
+    ports:
+      - "3000:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped

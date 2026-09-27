@@ -1,0 +1,55 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      httpclient:
+        connect-timeout: 2000
+        response-timeout: 10s
+      routes:
+        - id: order-service
+          uri: ${ORDER_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/v1/orders/**
+        - id: inventory-service
+          uri: ${INVENTORY_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/v1/inventory/**
+        - id: payment-service
+          uri: ${PAYMENT_SERVICE_URL:http://localhost:8083}
+          predicates:
+            - Path=/api/v1/payments/**
+
+oms:
+  jwt:
+    secret: ${JWT_SECRET:change-me-to-a-long-random-secret-key-32bytes}
+    expiration-ms: ${JWT_EXPIRATION_MS:3600000}
+  # Demo users only — replace in real deployments
+  users:
+    - username: customer
+      password: customer123
+      role: CUSTOMER
+    - username: admin
+      password: admin123
+      role: ADMIN
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway
+  endpoint:
+    health:
+      show-details: when_authorized
+    gateway:
+      enabled: true
+
+logging:
+  level:
+    com.oms.gateway: INFO
+    org.springframework.cloud.gateway: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} [corr=%X{correlationId}] - %msg%n"
